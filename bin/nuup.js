@@ -124,7 +124,13 @@ function report(plan, { write, json }) {
       out.write(`${JSON.stringify({ ...row, applied: write })}\n`);
     }
   } else {
-    for (const line of tabulate(plan.upgrades, ink)) out.write(`${line}\n`);
+    const rows = plan.upgrades.map((row) => ({
+      group: row.file,
+      name: row.package,
+      version: row.from,
+      to: row.to,
+    }));
+    for (const line of tabulate(rows, ink)) out.write(`${line}\n`);
   }
 
   // Everything that is not the answer goes to stderr, so a pipeline sees only
