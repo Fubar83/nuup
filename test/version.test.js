@@ -5,6 +5,7 @@ import {
   compareVersions,
   isPrerelease,
   parseVersion,
+  parseLock,
   pickUpgrade,
 } from '../src/version.js';
 
@@ -128,4 +129,69 @@ test('the newest allowed version wins, whatever order the feed gave them', () =>
 test('the version that comes back is spelled as the feed spelled it', () => {
   // 3.4 and 3.4.0 are the same version; the file should get what the feed said.
   assert.equal(pickUpgrade('3.1.1', ['3.4'], { lock: 'major' }), '3.4');
+});
+
+// A ceiling: "not past here", meaning the same thing for every project,
+// where a keyword lock means something different for each one.
+
+const CEILING_FEED = ['3.1.1', '4.2.0', '5.0.0', '5.4.9', '5.9.1', '6.0.0', '6.1.0'];
+
+test('a ceiling takes the highest version below it', () => {
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<6.0.0' }), '5.9.1');
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<5.0.0' }), '4.2.0');
+});
+
+test('a ceiling crosses majors freely on the way up', () => {
+  // The whole point: 3.1.1 to 5.9.1 is two major bumps, and that is allowed
+  // because the ceiling is what was asked for, not the major.
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<6.0.0' }), '5.9.1');
+});
+
+test('an inclusive ceiling includes the version it names', () => {
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<=5.4.9' }), '5.4.9');
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<=6.0.0' }), '6.0.0');
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<6.0.0' }), '5.9.1');
+});
+
+test('a ceiling at or below the current version permits nothing', () => {
+  assert.equal(pickUpgrade('5.9.1', CEILING_FEED, { lock: '<5.0.0' }), null);
+  assert.equal(pickUpgrade('6.1.0', CEILING_FEED, { lock: '<6.0.0' }), null);
+});
+
+test('whitespace around a ceiling is tolerated', () => {
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '< 6.0.0' }), '5.9.1');
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: ' <=5.4.9 ' }), '5.4.9');
+});
+
+test('a ceiling may name a partial version', () => {
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<6' }), '5.9.1');
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<5.5' }), '5.4.9');
+});
+
+// `<6.0.0` reads as "not a 6", and 6.0.0-rc.1 is a 6 by anyone's reading even
+// though it sorts below 6.0.0. This is the rule npm's semver settled on.
+test('a prerelease of the ceiling itself is not below it', () => {
+  const feed = ['5.0.0', '6.0.0-rc.1'];
+  assert.equal(pickUpgrade('5.0.0', feed, { lock: '<6.0.0', prerelease: true }), null);
+  // An inclusive ceiling names 6.0.0 as acceptable, so its prerelease is too.
+  assert.equal(pickUpgrade('5.0.0', feed, { lock: '<=6.0.0', prerelease: true }), '6.0.0-rc.1');
+});
+
+test('a prerelease below the ceiling is still subject to --prerelease', () => {
+  const feed = ['5.0.0', '5.5.0-beta.1'];
+  assert.equal(pickUpgrade('5.0.0', feed, { lock: '<6.0.0' }), null, 'off by default');
+  assert.equal(pickUpgrade('5.0.0', feed, { lock: '<6.0.0', prerelease: true }), '5.5.0-beta.1');
+});
+
+test('the keywords still mean what they meant', () => {
+  assert.deepEqual(parseLock('major'), { keyword: 'major' });
+  assert.deepEqual(parseLock('NONE'), { keyword: 'none' }, 'a keyword is case-insensitive');
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: 'none' }), '6.1.0');
+});
+
+test('a ceiling that is not a version, or a floor, is refused', () => {
+  for (const lock of ['<nonsense', '>6.0.0', '>=6.0.0', '6.0.0', '<', '<=', 'patch', '']) {
+    assert.equal(parseLock(lock), null, `${lock} should not parse as a lock`);
+  }
+  assert.equal(pickUpgrade('3.1.1', CEILING_FEED, { lock: '<nonsense' }), null);
 });

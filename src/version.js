@@ -93,20 +93,65 @@ export function compareVersions(a, b) {
 export const LOCKS = ['minor', 'major', 'none'];
 
 /**
+ * Read what a `--version-lock` was asked for.
+ *
+ * Two shapes, because there are two ways to say "not past here". A keyword
+ * pins a part of whatever version a project is on, and so means something
+ * different for each project. A ceiling names one version and means the same
+ * thing everywhere:
+ *
+ *   major     the major stays; minor and patch may move
+ *   minor     the major and minor stay; only the patch may move
+ *   none      nothing is pinned
+ *   <6.0.0    anything below 6.0.0, so the highest 5.x there is
+ *   <=5.9.9   anything up to and including 5.9.9
+ *
+ * Returns null for anything else, so a caller can complain about it rather
+ * than quietly treating a typo as "no limit".
+ */
+export function parseLock(text = 'major') {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (LOCKS.includes(trimmed.toLowerCase())) return { keyword: trimmed.toLowerCase() };
+
+  const comparator = /^(<=|<)\s*(.+)$/.exec(trimmed);
+  if (comparator === null) return null;
+
+  const below = parseVersion(comparator[2]);
+  if (below === null) return null;
+  return { below, inclusive: comparator[1] === '<=' };
+}
+
+/** Whether two versions are the same release, ignoring any prerelease label. */
+const sameRelease = (a, b) => a.parts.every((part, index) => part === b.parts[index]);
+
+/**
  * Whether `candidate` is an upgrade `lock` permits over `current`.
  *
- * The lock names what must not change, which is why there is no 'patch':
- * locking the patch would pin all three parts and permit nothing at all.
- *
- *   major  the major stays; minor and patch may move
- *   minor  the major and minor stay; only the patch may move
- *   none   nothing is pinned
+ * `lock` is either a string to be read by `parseLock` or one it has already
+ * read. An upgrade is never a downgrade, so the current version is always the
+ * floor and a lock only ever says how far up to go.
  */
 export function allows(current, candidate, lock = 'major') {
+  const rule = typeof lock === 'string' ? parseLock(lock) : lock;
+  if (!rule) return false;
   if (compareVersions(candidate, current) <= 0) return false;
-  if (lock === 'none') return true;
+
+  if (rule.below) {
+    const against = compareVersions(candidate, rule.below);
+    if (rule.inclusive ? against > 0 : against >= 0) return false;
+    // `<6.0.0` reads as "not 6", and 6.0.0-rc.1 is a 6 by anyone's reading,
+    // even though it sorts below 6.0.0. Excluding it is the least surprising
+    // answer, and it is the rule npm's semver settled on for the same reason.
+    if (!rule.inclusive && isPrerelease(candidate) && sameRelease(candidate, rule.below)) {
+      return false;
+    }
+    return true;
+  }
+
+  if (rule.keyword === 'none') return true;
   if (candidate.parts[0] !== current.parts[0]) return false;
-  if (lock === 'major') return true;
+  if (rule.keyword === 'major') return true;
   return candidate.parts[1] === current.parts[1];
 }
 
@@ -122,6 +167,9 @@ export function pickUpgrade(current, available, { lock = 'major', prerelease = f
   const from = parseVersion(current);
   if (from === null) return null;
 
+  const rule = typeof lock === 'string' ? parseLock(lock) : lock;
+  if (rule === null) return null;
+
   const wantPrerelease = prerelease || isPrerelease(from);
 
   let best = null;
@@ -129,7 +177,7 @@ export function pickUpgrade(current, available, { lock = 'major', prerelease = f
     const candidate = parseVersion(text);
     if (candidate === null) continue;
     if (isPrerelease(candidate) && !wantPrerelease) continue;
-    if (!allows(from, candidate, lock)) continue;
+    if (!allows(from, candidate, rule)) continue;
     if (best === null || compareVersions(candidate, best) > 0) best = candidate;
   }
 

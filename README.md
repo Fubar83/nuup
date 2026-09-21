@@ -48,7 +48,7 @@ npm install -g @fub4r/nuup
 ```
 nuup
   -f,  --filter <glob>          (repeatable)
-  -vl, --version-lock <lock>
+  -vl, --version-lock <major|minor|none|"<6.0.0"|"<=5.9.9">
        --prerelease
   -w,  --write
   -j,  --json
@@ -69,13 +69,29 @@ Omitted, every package is considered.
 
 ### `--version-lock <lock>`
 
-What must **not** change. On `3.1.1`, with 3.1.2, 3.4.0 and 4.4.0 available:
+How far up to go. Two shapes, because there are two ways to say "not past here".
+
+**A keyword** pins a part of whatever version each project is already on, so it means something different for each of them. On `3.1.1`, with 3.1.2, 3.4.0 and 4.4.0 available:
 
 | lock | picks | |
 |---|---|---|
 | `major` | 3.4.0 | the major stays; minor and patch move — **the default** |
 | `minor` | 3.1.2 | major and minor stay; only the patch moves |
 | `none` | 4.4.0 | nothing pinned, major bumps included |
+
+**A ceiling** names one version and means the same thing everywhere. On `3.1.1`, with 4.2.0, 5.0.0, 5.9.1, 6.0.0 and 6.1.0 available:
+
+| lock | picks | |
+|---|---|---|
+| `"<6.0.0"` | 5.9.1 | the highest 5.x there is |
+| `"<5.0.0"` | 4.2.0 | the highest 4.x there is |
+| `"<=5.4.9"` | 5.4.9 | up to and including the version named |
+
+A ceiling will cross majors on the way up — `3.1.1` to `5.9.1` is two major bumps — because the ceiling is what you asked for, not the major. That is the point of it: *get as current as you can without going into 6*.
+
+> **Quote it.** `<` is a redirection operator in every shell. `nuup -vl <6.0.0` never reaches nuup at all — bash reports `6.0.0: No such file or directory`, and cmd and PowerShell fail their own way. Write `-vl "<6.0.0"`.
+
+A partial version works (`"<6"` is the same as `"<6.0.0"`), and a floor is refused: an upgrade never goes below where it started, so `">=5.0.0"` would add nothing.
 
 The default is `major`, so an unqualified run can never cross a major boundary. That differs from `dotnet outdated`, which defaults to none — the difference matters more when a tool is editing forty repositories at once.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { EXIT, UsageError, reportError } from '../src/errors.js';
-import { LOCKS } from '../src/version.js';
+import { LOCKS, parseLock } from '../src/version.js';
 import { SKIPPED, planUpgrades, writeUpgrades } from '../src/upgrade.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -16,11 +16,16 @@ Options:
                           Repeatable, and repeats are OR-ed. Omitted, every
                           package is considered.
   -vl, --version-lock <lock>
-                          What must NOT change. One of:
+                          How far up to go. Either what must NOT change:
                             major  the major stays; minor and patch may move
                                    (the default)
                             minor  major and minor stay; only the patch moves
                             none   nothing is pinned, major bumps included
+                          or a ceiling, which means the same for every project:
+                            "<6.0.0"   the highest 5.x there is
+                            "<=5.9.9"  up to and including 5.9.9
+                          Quote a ceiling. Every shell reads a bare < as a
+                          redirection, so -vl <6.0.0 never reaches nuup.
        --prerelease       Consider prerelease versions. A package already on
                           a prerelease is offered newer ones regardless.
   -w,  --write            Apply the upgrades. Without it nothing is written.
@@ -76,16 +81,20 @@ function parse(argv) {
     else if (token === '--prerelease') options.prerelease = true;
     else if (token.startsWith('--filter')) options.filters.push(valueFor('--filter'));
     else if (token.startsWith('--version-lock')) {
-      const lock = valueFor('--version-lock').toLowerCase();
-      if (lock === 'patch') {
+      const lock = valueFor('--version-lock');
+      if (lock.toLowerCase() === 'patch') {
         throw new UsageError(
           'version-lock patch would pin every part and allow nothing to change; ' +
             'did you mean --version-lock minor, which allows patch updates?',
           { hint: HINT },
         );
       }
-      if (!LOCKS.includes(lock)) {
-        throw new UsageError(`--version-lock takes one of ${LOCKS.join(', ')}`, { hint: HINT });
+      if (parseLock(lock) === null) {
+        throw new UsageError(
+          `--version-lock takes one of ${LOCKS.join(', ')}, or a ceiling such as "<6.0.0" ` +
+            'or "<=5.9.9" — quote it, or the shell reads < as a redirection',
+          { hint: HINT },
+        );
       }
       options.lock = lock;
     } else {
