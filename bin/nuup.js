@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
+import { paletteFor } from '../src/color.js';
+import { tabulate } from '../src/table.js';
 import { EXIT, UsageError, reportError } from '../src/errors.js';
 import { LOCKS, parseLock } from '../src/version.js';
 import { SKIPPED, planUpgrades, writeUpgrades } from '../src/upgrade.js';
@@ -112,15 +114,17 @@ const plural = (count, one, many) => (count === 1 ? one : many);
 
 function report(plan, { write, json }) {
   const out = process.stdout;
+  // Decided per stream: `nuup > plan.txt` still wants a readable summary on
+  // the terminal, and escape codes in the file would be corruption.
+  const ink = paletteFor(process.stdout);
+  const note = paletteFor(process.stderr);
 
   if (json) {
     for (const row of plan.upgrades) {
       out.write(`${JSON.stringify({ ...row, applied: write })}\n`);
     }
   } else {
-    for (const row of plan.upgrades) {
-      out.write(`${row.file}: ${row.package} ${row.from} -> ${row.to}\n`);
-    }
+    for (const line of tabulate(plan.upgrades, ink)) out.write(`${line}\n`);
   }
 
   // Everything that is not the answer goes to stderr, so a pipeline sees only
@@ -132,20 +136,25 @@ function report(plan, { write, json }) {
   const notFound = counts.get(SKIPPED.NOT_FOUND) ?? 0;
   const notVersion = counts.get(SKIPPED.NOT_A_VERSION) ?? 0;
 
-  const parts = [`${plan.upgrades.length} to upgrade`];
+  const parts = [note.green(`${plan.upgrades.length} to upgrade`)];
   if (counts.get(SKIPPED.UP_TO_DATE)) parts.push(`${counts.get(SKIPPED.UP_TO_DATE)} up to date`);
-  if (notVersion) parts.push(`${notVersion} not a plain version`);
-  if (notFound) parts.push(`${notFound} not on any source`);
-  if (unchecked) parts.push(`${unchecked} could not be checked`);
-  process.stderr.write(`nuup: ${parts.join(', ')}\n`);
+  if (notVersion) parts.push(note.dim(`${notVersion} not a plain version`));
+  if (notFound) parts.push(note.yellow(`${notFound} not on any source`));
+  // Not knowing is the state worth spotting across forty repositories.
+  if (unchecked) parts.push(note.yellow(`${unchecked} could not be checked`));
+  process.stderr.write(`${note.bold('nuup:')} ${parts.join(', ')}\n`);
 
   for (const problem of plan.problems) {
-    process.stderr.write(`nuup: ${problem.source ?? 'a source'} — ${problem.text}\n`);
+    process.stderr.write(
+      `${note.bold('nuup:')} ${note.red(`${problem.source ?? 'a source'} — ${problem.text}`)}\n`,
+    );
   }
   if (unchecked > 0) {
     process.stderr.write(
-      `nuup: ${unchecked} ${plural(unchecked, 'package was', 'packages were')} not checked ` +
-        'because a source failed; they are not known to be up to date\n',
+      `${note.bold('nuup:')} ${note.yellow(
+        `${unchecked} ${plural(unchecked, 'package was', 'packages were')} not checked ` +
+          'because a source failed; they are not known to be up to date',
+      )}\n`,
     );
   }
 }

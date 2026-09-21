@@ -6,8 +6,11 @@ Upgrade the NuGet packages a repository references, by editing the files that de
 
 ```console
 $ nuup -f "MyCompany.*"
-src/Api/Api.csproj: MyCompany.Core 1.4.0 -> 1.6.2
-Directory.Packages.props: MyCompany.Messaging 2.0.1 -> 2.3.0
+Directory.Packages.props
+  MyCompany.Messaging ... 2.0.1 -> 2.3.0
+
+src/Api/Api.csproj
+  MyCompany.Core ........ 1.4.0 -> 1.6.2
 nuup: 2 to upgrade, 7 up to date, 1 not a plain version
 nuup: nothing was written; pass --write to apply
 ```
@@ -56,6 +59,8 @@ nuup
 ```
 
 `nuup` edits files and stops. It never restores, builds, commits, pushes or opens a pull request — verifying the change is yours.
+
+Upgrades are printed as a table, grouped under the file that holds them, with the versions aligned so the new column reads straight down. Colour is used on a terminal and never down a pipe, so piped output is byte-for-byte what it always was; `NO_COLOR` turns it off and `FORCE_COLOR` turns it on.
 
 ### `--filter <glob>`
 

@@ -1,3 +1,5 @@
+import { paletteFor } from './color.js';
+
 /**
  * Exit codes are distinct so a caller can tell a mistyped command line from a
  * run that happened and failed:
@@ -39,8 +41,10 @@ export function formatError(error) {
 
 /** Print an error the way the CLI should, and return the exit code to use. */
 export function reportError(error) {
-  process.stderr.write(`${formatError(error)}\n`);
+  const note = paletteFor(process.stderr);
+  process.stderr.write(`${note.red(formatError(error))}\n`);
   if (error instanceof UsageError && error.hint) {
+    // The usage that follows is help, not the complaint, so it stays plain.
     process.stderr.write(`\n${error.hint}\n`);
   }
   return error.exitCode ?? EXIT.RUNTIME;
