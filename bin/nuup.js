@@ -11,7 +11,8 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 const USAGE = `nuup — upgrade the NuGet packages a repository references
 
 Usage:
-  nuup [-f <glob>]... [-vl <lock>] [--prerelease] [--write] [--json]
+  nuup [-f|--filter <glob>]... [-vl|--version-lock <lock>] [--prerelease]
+       [-w|--write] [-j|--json]
 
 Options:
   -f,  --filter <glob>    Only packages whose name matches, e.g. "MyCompany.*".
@@ -46,7 +47,8 @@ stay yours:
   repwrk foreach --parallel dotnet build`;
 
 const HINT = `Usage:
-  nuup [-f <glob>]... [-vl <lock>] [--prerelease] [--write] [--json]`;
+  nuup [-f|--filter <glob>]... [-vl|--version-lock <lock>] [--prerelease]
+       [-w|--write] [-j|--json]`;
 
 const SHORT = { '-f': '--filter', '-vl': '--version-lock', '-w': '--write', '-j': '--json' };
 
