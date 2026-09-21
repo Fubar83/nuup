@@ -123,6 +123,20 @@ Only the version text is replaced, at the exact offset it sits at. Formatting, a
 
 A `<PackageReference Include="Serilog" />` under CPM carries no version, so it is not a site and nothing is written there. The `<PackageVersion>` in `Directory.Packages.props` is the site, and that is where the edit lands. `packages.config`, `Directory.Build.props` and `Directory.Build.targets` are all read the same way: `nuup` edits wherever a version is actually written.
 
+**What you are shown is not that file.** Where to write is the tool’s problem; what you want to read is which of your projects is on the old version. So the report groups by the projects that *reference* the package, exactly as `nuls` does — even when the single edit happens somewhere else entirely:
+
+```console
+$ nuup -f xunit -vl none
+src/Api/CentralOnly.csproj
+  xunit .................................... 2.4.1 -> 2.9.3
+nuup: 1 to upgrade
+
+$ nuup -f xunit -vl none --write && git diff --stat
+ Directory.Packages.props | 2 +-
+```
+
+A version written inside a project speaks only for that project — two projects pinning the same package separately are two independent upgrades. A version in a shared file speaks for every project below it that references the package. One that nothing references at all is shown against the file declaring it, since there is no project to show it under.
+
 ## Up to date is not the same as unchecked
 
 If a source fails, the packages it serves come back with no versions. Reporting that as "up to date" is how a sweep silently skips every internal package in an estate and still exits 0. `nuup` tells them apart, says which source failed, and exits non-zero:

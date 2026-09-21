@@ -124,12 +124,18 @@ function report(plan, { write, json }) {
       out.write(`${JSON.stringify({ ...row, applied: write })}\n`);
     }
   } else {
-    const rows = plan.upgrades.map((row) => ({
-      group: row.file,
-      name: row.package,
-      version: row.from,
-      to: row.to,
-    }));
+    // Shown under the projects that reference the package, not under the
+    // file its version happens to be written in. Where to write is this
+    // tool’s problem; who is affected is the reader’s.
+    const rows = plan.upgrades
+      .flatMap((row) => row.projects.map((project) => ({ ...row, project })))
+      .sort((a, b) => a.project.localeCompare(b.project) || a.package.localeCompare(b.package))
+      .map((row) => ({
+        group: row.project,
+        name: row.package,
+        version: row.from,
+        to: row.to,
+      }));
     for (const line of tabulate(rows, ink)) out.write(`${line}\n`);
   }
 

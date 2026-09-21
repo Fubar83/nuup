@@ -4,6 +4,7 @@ import { applyUpgrades, declarationsIn } from './declarations.js';
 import { projectFiles } from './discover.js';
 import { availableVersionsFor } from './feed.js';
 import { matchesAny } from './glob.js';
+import { isProject, projectsUsing, referencesByProject } from './references.js';
 import { parseVersion, pickUpgrade } from './version.js';
 
 /**
@@ -24,10 +25,19 @@ export const SKIPPED = {
 
 const relative = (root, file) => path.relative(root, file).split(path.sep).join('/');
 
-/** Every version literal in the repository, with the file it lives in. */
-export function sitesIn(directory) {
+/**
+ * Read the repository once, answering both questions it holds.
+ *
+ * `sites` are the version literals — where an edit goes. `projects` maps each
+ * project to the packages it references — what a person reads. Under central
+ * package management these never coincide, and conflating them is how a
+ * report ends up saying `Directory.Packages.props` to somebody who wanted to
+ * know which of their services is on the old version.
+ */
+export function surveyRepo(directory) {
   const root = path.resolve(directory);
   const sites = [];
+  const files = [];
 
   for (const file of projectFiles(root)) {
     let text;
@@ -37,12 +47,49 @@ export function sitesIn(directory) {
       // A file that cannot be read is not a site; a sweep should not stop.
       continue;
     }
+    const where = relative(root, file);
+    files.push({ path: where, text });
     for (const site of declarationsIn(text, { file })) {
-      sites.push({ ...site, path: relative(root, file) });
+      sites.push({ ...site, path: where });
     }
   }
 
-  return sites;
+  return { sites, projects: referencesByProject(files) };
+}
+
+/** Every version literal in the repository, with the file it lives in. */
+export function sitesIn(directory) {
+  return surveyRepo(directory).sites;
+}
+
+/**
+ * The projects a site speaks for.
+ *
+ * A version written inside a project is that project's own, however many
+ * others reference the same package — two projects pinning Newtonsoft.Json
+ * separately are two independent upgrades, and showing each under both would
+ * be a straight lie.
+ *
+ * A version in a shared file speaks for every project below it that
+ * references the package, which is the whole point of putting it there. The
+ * directory matters: a nested Directory.Packages.props governs its own subtree
+ * and nothing above it.
+ *
+ * A version nothing references — a PackageVersion left behind after the last
+ * project using it went away — falls back to the file that declares it,
+ * because there is no project to show it under.
+ */
+export function affectedBy(site, projects) {
+  if (isProject(site.path)) return [site.path];
+
+  const directory = site.path.includes('/')
+    ? site.path.slice(0, site.path.lastIndexOf('/') + 1)
+    : '';
+  const using = projectsUsing(projects, site.package).filter((project) =>
+    project.startsWith(directory),
+  );
+
+  return using.length > 0 ? using : [site.path];
 }
 
 /**
@@ -57,7 +104,8 @@ export async function planUpgrades(directory, options = {}) {
   const { filters = [], lock = 'major', prerelease = false } = options;
   const repo = path.basename(path.resolve(directory));
 
-  const wanted = sitesIn(directory).filter((site) => matchesAny(site.package, filters));
+  const { sites, projects } = surveyRepo(directory);
+  const wanted = sites.filter((site) => matchesAny(site.package, filters));
   const answers = await availableVersionsFor(
     wanted.map((site) => site.package),
     options,
@@ -98,7 +146,14 @@ export async function planUpgrades(directory, options = {}) {
       continue;
     }
 
-    upgrades.push({ ...row, to, start: site.start, end: site.end, absolute: site.file });
+    upgrades.push({
+      ...row,
+      to,
+      projects: affectedBy(site, projects),
+      start: site.start,
+      end: site.end,
+      absolute: site.file,
+    });
   }
 
   return { repo, upgrades, skipped, problems: [...problems.values()] };
