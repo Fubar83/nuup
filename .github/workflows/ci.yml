@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A superseded run on the same PR is of no interest; cancel it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # The tests that ask MSBuild skip themselves when dotnet is missing, so
+      # install it deliberately rather than depend on what an image happens to
+      # ship: a silently skipped test is the one worth having.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      # nuup has no dependencies, so there is nothing to install.
+      - run: node --version && dotnet --version
+      - run: npm test
+
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Install the tarball npm would publish, so a file missing from
+      # "files" fails here rather than for whoever installs the release.
+      # The tarball name follows the package name, so ask npm for it.
+      - run: npm install --global "$(npm pack --silent)"
+      - run: nuup --version
+      - run: nuup --help
