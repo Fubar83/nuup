@@ -6,11 +6,12 @@ Upgrade the NuGet packages a repository references, by editing the files that de
 
 ```console
 $ nuup -f "MyCompany.*"
-Directory.Packages.props
-  MyCompany.Messaging ... 2.0.1 -> 2.3.0
-
 src/Api/Api.csproj
-  MyCompany.Core ........ 1.4.0 -> 1.6.2
+  MyCompany.Core ........................... 1.4.0 -> 1.6.2
+  MyCompany.Messaging ...................... 2.0.1 -> 2.3.0
+
+src/Web/Web.csproj
+  MyCompany.Messaging ...................... 2.0.1 -> 2.3.0
 nuup: 2 to upgrade, 7 up to date, 1 not a plain version
 nuup: nothing was written; pass --write to apply
 ```
