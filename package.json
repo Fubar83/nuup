@@ -1,0 +1,49 @@
+{
+  "name": "@fub4r/nuup",
+  "version": "0.1.0",
+  "description": "Upgrade the NuGet packages a repository references, by editing the files that declare them — no restore, no build",
+  "keywords": [
+    "nuget",
+    "dotnet",
+    "csproj",
+    "packages",
+    "upgrade",
+    "update",
+    "bump",
+    "dependencies",
+    "versions",
+    "central-package-management",
+    "cli",
+    "multi-repo",
+    "bulk"
+  ],
+  "license": "MIT",
+  "author": "Henrik Johansson (https://github.com/Fubar83)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fubar83/nuup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Fubar83/nuup/issues"
+  },
+  "homepage": "https://github.com/Fubar83/nuup#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "nuup": "bin/nuup.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepublishOnly": "node --test"
+  }
+}
