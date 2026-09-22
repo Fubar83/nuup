@@ -114,6 +114,9 @@ function parse(argv) {
 
 const plural = (count, one, many) => (count === 1 ? one : many);
 
+/** How many held-back packages are named before the rest become a count. */
+const HELD_SHOWN = 3;
+
 function report(plan, { write, json }) {
   const out = process.stdout;
   // Decided per stream: `nuup > plan.txt` still wants a readable summary on
@@ -149,14 +152,30 @@ function report(plan, { write, json }) {
   const unchecked = counts.get(SKIPPED.UNCHECKED) ?? 0;
   const notFound = counts.get(SKIPPED.NOT_FOUND) ?? 0;
   const notVersion = counts.get(SKIPPED.NOT_A_VERSION) ?? 0;
+  const held = plan.skipped.filter((row) => row.reason === SKIPPED.HELD);
 
   const parts = [note.green(`${plan.upgrades.length} to upgrade`)];
   if (counts.get(SKIPPED.UP_TO_DATE)) parts.push(`${counts.get(SKIPPED.UP_TO_DATE)} up to date`);
+  if (held.length) parts.push(note.yellow(`${held.length} held by the version lock`));
   if (notVersion) parts.push(note.dim(`${notVersion} not a plain version`));
   if (notFound) parts.push(note.yellow(`${notFound} not on any source`));
   // Not knowing is the state worth spotting across forty repositories.
   if (unchecked) parts.push(note.yellow(`${unchecked} could not be checked`));
   process.stderr.write(`${note.bold('nuup:')} ${parts.join(', ')}\n`);
+
+  // Name what is being held back, or the count alone reads as "nothing newer
+  // exists" — which is exactly the misreading it is here to prevent.
+  for (const row of held.slice(0, HELD_SHOWN)) {
+    process.stderr.write(
+      `${note.bold('nuup:')} ${row.package} could go to ${note.green(row.newest)}, ` +
+        `held at ${row.from} by --version-lock\n`,
+    );
+  }
+  if (held.length > HELD_SHOWN) {
+    process.stderr.write(
+      `${note.bold('nuup:')} ${note.dim(`and ${held.length - HELD_SHOWN} more held back`)}\n`,
+    );
+  }
 
   for (const problem of plan.problems) {
     process.stderr.write(

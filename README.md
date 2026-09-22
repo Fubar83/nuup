@@ -99,7 +99,15 @@ A ceiling will cross majors on the way up — `3.1.1` to `5.9.1` is two major bu
 
 A partial version works (`"<6"` is the same as `"<6.0.0"`), and a floor is refused: an upgrade never goes below where it started, so `">=5.0.0"` would add nothing.
 
-The default is `major`, so an unqualified run can never cross a major boundary. That differs from `dotnet outdated`, which defaults to none — the difference matters more when a tool is editing forty repositories at once.
+The default is `major`, so an unqualified run can never cross a major boundary.
+
+When that default holds something back, it says so rather than calling it up to date — being on the newest 8.x while 10.x exists is not the same thing:
+
+```console
+$ nuup -f "Microsoft.Extensions.*"
+nuup: 0 to upgrade, 1 held by the version lock
+nuup: Microsoft.Extensions.DependencyInjection could go to 10.0.12, held at 8.0.1 by --version-lock
+``` That differs from `dotnet outdated`, which defaults to none — the difference matters more when a tool is editing forty repositories at once.
 
 There is no `patch`: locking the patch would pin all three parts and permit nothing. Passing it says so and suggests `--version-lock minor`, which is how you ask for patch-only updates.
 
