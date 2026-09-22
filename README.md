@@ -61,7 +61,7 @@ nuup
 
 `nuup` edits files and stops. It never restores, builds, commits, pushes or opens a pull request — verifying the change is yours.
 
-Upgrades are printed as a table, grouped under the file that holds them, with the versions aligned so the new column reads straight down. Colour is used on a terminal and never down a pipe, so piped output is byte-for-byte what it always was; `NO_COLOR` turns it off and `FORCE_COLOR` turns it on.
+Upgrades are printed as a table, grouped under the projects that reference each package, with the versions aligned so the new column reads straight down.
 
 ### `--filter <glob>`
 
@@ -167,15 +167,31 @@ repwrk foreach git commit -am "Bump internal packages"
 
 `nuls` lists what an estate references; `nuup` changes it. They are separate tools on purpose, and neither depends on the other.
 
+## Colour
+
+Colour is decided per stream, not per process. `nuup` puts data on stdout and commentary on stderr, and the two are redirected independently: `nuup > plan.txt` still wants a readable summary on the terminal, and escape codes in the file would be corruption.
+
+A stream that is not a terminal never gets colour, so a pipe receives exactly the bytes it would have without any of this. `NO_COLOR` turns it off, `FORCE_COLOR` turns it on where nothing can be detected, and `FORCE_COLOR=0` is the explicit off switch.
+
+It marks a state rather than decorating one: the count that could not be checked is yellow, because that is the one worth spotting across forty repositories, and a failing source is red.
+
 ## Exit codes
 
-| | |
-|---|---|
+| Code | Meaning |
+| --- | --- |
 | `0` | Success |
 | `1` | A source could not be reached, or a file could not be written |
 | `2` | Usage error |
 
 A run where some source failed exits `1` even when the upgrades it did find were applied, so a script cannot mistake a partial answer for a complete one.
+
+## Development
+
+```bash
+npm test
+```
+
+Version comparison, the surgical edits and the table are tested on their own; the feed is tested through an injected `dotnet package search`, and repository scanning against fixture trees. Nothing in the suite touches the network.
 
 ## Licence
 
