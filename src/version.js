@@ -109,7 +109,7 @@ export const LOCKS = ['minor', 'major', 'none'];
  * Returns null for anything else, so a caller can complain about it rather
  * than quietly treating a typo as "no limit".
  */
-export function parseLock(text = 'major') {
+export function parseLock(text = 'none') {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
   if (LOCKS.includes(trimmed.toLowerCase())) return { keyword: trimmed.toLowerCase() };
@@ -132,7 +132,7 @@ const sameRelease = (a, b) => a.parts.every((part, index) => part === b.parts[in
  * read. An upgrade is never a downgrade, so the current version is always the
  * floor and a lock only ever says how far up to go.
  */
-export function allows(current, candidate, lock = 'major') {
+export function allows(current, candidate, lock = 'none') {
   const rule = typeof lock === 'string' ? parseLock(lock) : lock;
   if (!rule) return false;
   if (compareVersions(candidate, current) <= 0) return false;
@@ -163,7 +163,7 @@ export function allows(current, candidate, lock = 'major') {
  * newer prerelease from it would answer "nothing to do" while a newer one
  * sits on the feed.
  */
-export function pickUpgrade(current, available, { lock = 'major', prerelease = false } = {}) {
+export function pickUpgrade(current, available, { lock = 'none', prerelease = false } = {}) {
   const from = parseVersion(current);
   if (from === null) return null;
 

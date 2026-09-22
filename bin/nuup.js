@@ -19,11 +19,12 @@ Options:
                           Repeatable, and repeats are OR-ed. Omitted, every
                           package is considered.
   -vl, --version-lock <lock>
-                          How far up to go. Either what must NOT change:
-                            major  the major stays; minor and patch may move
-                                   (the default)
-                            minor  major and minor stay; only the patch moves
+                          How far up to go. Nothing is locked unless you say
+                          so. Either what must NOT change:
                             none   nothing is pinned, major bumps included
+                                   (the default)
+                            major  the major stays; minor and patch may move
+                            minor  major and minor stay; only the patch moves
                           or a ceiling, which means the same for every project:
                             "<6.0.0"   the highest 5.x there is
                             "<=5.9.9"  up to and including 5.9.9
@@ -55,7 +56,7 @@ const SHORT = { '-f': '--filter', '-vl': '--version-lock', '-w': '--write', '-j'
 function parse(argv) {
   const options = {
     filters: [],
-    lock: 'major',
+    lock: 'none',
     prerelease: false,
     write: false,
     json: false,

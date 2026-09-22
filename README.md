@@ -81,9 +81,9 @@ How far up to go. Two shapes, because there are two ways to say "not past here".
 
 | lock | picks | |
 |---|---|---|
-| `major` | 3.4.0 | the major stays; minor and patch move — **the default** |
+| `major` | 3.4.0 | the major stays; minor and patch move |
 | `minor` | 3.1.2 | major and minor stay; only the patch moves |
-| `none` | 4.4.0 | nothing pinned, major bumps included |
+| `none` | 4.4.0 | nothing pinned, major bumps included — **the default** |
 
 **A ceiling** names one version and means the same thing everywhere. On `3.1.1`, with 4.2.0, 5.0.0, 5.9.1, 6.0.0 and 6.1.0 available:
 
@@ -99,7 +99,7 @@ A ceiling will cross majors on the way up — `3.1.1` to `5.9.1` is two major bu
 
 A partial version works (`"<6"` is the same as `"<6.0.0"`), and a floor is refused: an upgrade never goes below where it started, so `">=5.0.0"` would add nothing.
 
-The default is `major`, so an unqualified run can never cross a major boundary.
+Nothing is locked unless you ask. A lock is a decision somebody makes for a reason, not one to inherit quietly — and an unqualified run that silently withheld major versions would report them as nothing to do.
 
 When that default holds something back, it says so rather than calling it up to date — being on the newest 8.x while 10.x exists is not the same thing:
 
@@ -107,7 +107,7 @@ When that default holds something back, it says so rather than calling it up to 
 $ nuup -f "Microsoft.Extensions.*"
 nuup: 0 to upgrade, 1 held by the version lock
 nuup: Microsoft.Extensions.DependencyInjection could go to 10.0.12, held at 8.0.1 by --version-lock
-``` That differs from `dotnet outdated`, which defaults to none — the difference matters more when a tool is editing forty repositories at once.
+``` When a lock you asked for holds something back, it says so rather than calling it up to date — being on the newest 8.x while 10.x exists is not the same thing.
 
 There is no `patch`: locking the patch would pin all three parts and permit nothing. Passing it says so and suggests `--version-lock minor`, which is how you ask for patch-only updates.
 

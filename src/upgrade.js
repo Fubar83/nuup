@@ -112,7 +112,7 @@ export function affectedBy(site, projects) {
  * while reporting success.
  */
 export async function planUpgrades(directory, options = {}) {
-  const { filters = [], lock = 'major', prerelease = false } = options;
+  const { filters = [], lock = 'none', prerelease = false } = options;
   const repo = path.basename(path.resolve(directory));
 
   const { sites, projects } = surveyRepo(directory);
