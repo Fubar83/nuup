@@ -1,6 +1,6 @@
 {
   "name": "@fub4r/nuup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Upgrade the NuGet packages a repository references, by editing the files that declare them — no restore, no build",
   "keywords": [
     "nuget",

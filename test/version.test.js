@@ -80,8 +80,11 @@ test('lock none takes the newest there is', () => {
   assert.equal(pickUpgrade('3.1.1', FEED, { lock: 'none' }), '4.4.0');
 });
 
-test('major is the default lock, so an unqualified run cannot cross a major', () => {
-  assert.equal(pickUpgrade('3.1.1', FEED), '3.4.1');
+// A lock is a decision somebody makes, not one to inherit quietly. The
+// default takes the newest there is; holding back is what you opt into.
+test('nothing is locked by default', () => {
+  assert.equal(pickUpgrade('3.1.1', FEED), '4.4.0');
+  assert.equal(pickUpgrade('3.1.1', FEED, { lock: 'major' }), '3.4.1', 'major is opt-in');
 });
 
 test('an upgrade is never a downgrade, and never a sideways move', () => {

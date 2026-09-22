@@ -61,7 +61,7 @@ nuup
 
 `nuup` edits files and stops. It never restores, builds, commits, pushes or opens a pull request — verifying the change is yours.
 
-Upgrades are printed as a table, grouped under the file that holds them, with the versions aligned so the new column reads straight down. Colour is used on a terminal and never down a pipe, so piped output is byte-for-byte what it always was; `NO_COLOR` turns it off and `FORCE_COLOR` turns it on.
+Upgrades are printed as a table, grouped under the projects that reference each package, with the versions aligned so the new column reads straight down.
 
 ### `--filter <glob>`
 
@@ -81,9 +81,9 @@ How far up to go. Two shapes, because there are two ways to say "not past here".
 
 | lock | picks | |
 |---|---|---|
-| `major` | 3.4.0 | the major stays; minor and patch move — **the default** |
+| `major` | 3.4.0 | the major stays; minor and patch move |
 | `minor` | 3.1.2 | major and minor stay; only the patch moves |
-| `none` | 4.4.0 | nothing pinned, major bumps included |
+| `none` | 4.4.0 | nothing pinned, major bumps included — **the default** |
 
 **A ceiling** names one version and means the same thing everywhere. On `3.1.1`, with 4.2.0, 5.0.0, 5.9.1, 6.0.0 and 6.1.0 available:
 
@@ -99,7 +99,15 @@ A ceiling will cross majors on the way up — `3.1.1` to `5.9.1` is two major bu
 
 A partial version works (`"<6"` is the same as `"<6.0.0"`), and a floor is refused: an upgrade never goes below where it started, so `">=5.0.0"` would add nothing.
 
-The default is `major`, so an unqualified run can never cross a major boundary. That differs from `dotnet outdated`, which defaults to none — the difference matters more when a tool is editing forty repositories at once.
+Nothing is locked unless you ask. A lock is a decision somebody makes for a reason, not one to inherit quietly — and an unqualified run that silently withheld major versions would report them as nothing to do.
+
+When that default holds something back, it says so rather than calling it up to date — being on the newest 8.x while 10.x exists is not the same thing:
+
+```console
+$ nuup -f "Microsoft.Extensions.*"
+nuup: 0 to upgrade, 1 held by the version lock
+nuup: Microsoft.Extensions.DependencyInjection could go to 10.0.12, held at 8.0.1 by --version-lock
+``` When a lock you asked for holds something back, it says so rather than calling it up to date — being on the newest 8.x while 10.x exists is not the same thing.
 
 There is no `patch`: locking the patch would pin all three parts and permit nothing. Passing it says so and suggests `--version-lock minor`, which is how you ask for patch-only updates.
 
@@ -159,15 +167,31 @@ repwrk foreach git commit -am "Bump internal packages"
 
 `nuls` lists what an estate references; `nuup` changes it. They are separate tools on purpose, and neither depends on the other.
 
+## Colour
+
+Colour is decided per stream, not per process. `nuup` puts data on stdout and commentary on stderr, and the two are redirected independently: `nuup > plan.txt` still wants a readable summary on the terminal, and escape codes in the file would be corruption.
+
+A stream that is not a terminal never gets colour, so a pipe receives exactly the bytes it would have without any of this. `NO_COLOR` turns it off, `FORCE_COLOR` turns it on where nothing can be detected, and `FORCE_COLOR=0` is the explicit off switch.
+
+It marks a state rather than decorating one: the count that could not be checked is yellow, because that is the one worth spotting across forty repositories, and a failing source is red.
+
 ## Exit codes
 
-| | |
-|---|---|
+| Code | Meaning |
+| --- | --- |
 | `0` | Success |
 | `1` | A source could not be reached, or a file could not be written |
 | `2` | Usage error |
 
 A run where some source failed exits `1` even when the upgrades it did find were applied, so a script cannot mistake a partial answer for a complete one.
+
+## Development
+
+```bash
+npm test
+```
+
+Version comparison, the surgical edits and the table are tested on their own; the feed is tested through an injected `dotnet package search`, and repository scanning against fixture trees. Nothing in the suite touches the network.
 
 ## Licence
 

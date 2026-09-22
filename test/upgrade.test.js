@@ -89,15 +89,15 @@ test('writing applies the plan and changes nothing else', async () => {
   assert.equal(after, source.replace('3.1.1', '3.4.0').replace('7.0.0', '7.2.4'));
 });
 
-test('the default lock will not cross a major boundary', async () => {
+test('nothing is locked by default; a lock is opted into', async () => {
   const root = await repo({ 'Api.csproj': csproj('    <PackageReference Include="Serilog" Version="3.1.1" />') });
   const versions = { Serilog: ['3.1.1', '3.4.0', '4.0.0'] };
 
   const byDefault = await planUpgrades(root, { run: feed(versions) });
-  assert.equal(byDefault.upgrades[0].to, '3.4.0');
+  assert.equal(byDefault.upgrades[0].to, '4.0.0', 'the newest there is');
 
-  const unlocked = await planUpgrades(root, { lock: 'none', run: feed(versions) });
-  assert.equal(unlocked.upgrades[0].to, '4.0.0');
+  const locked = await planUpgrades(root, { lock: 'major', run: feed(versions) });
+  assert.equal(locked.upgrades[0].to, '3.4.0');
 });
 
 test('a filter decides which packages are considered at all', async () => {
@@ -208,4 +208,65 @@ test('files are reported with forward slashes, whatever the platform', async () 
 
   const plan = await planUpgrades(root, { run: feed({ Serilog: ['3.4.0'] }) });
   assert.equal(plan.upgrades[0].file, 'src/Api/Api.csproj');
+});
+
+// Being on the newest 8.x while 10.x exists is not being up to date. Saying
+// so reads as the tool having missed the newer version — which is exactly
+// how this was reported.
+test('a version the lock excludes is held, not up to date', async () => {
+  const root = await repo({
+    'Api.csproj': csproj('    <PackageReference Include="M.E.DI" Version="8.0.1" />'),
+  });
+  const versions = { 'M.E.DI': ['8.0.1', '9.0.20', '10.0.12'] };
+
+  const locked = await planUpgrades(root, { lock: 'major', run: feed(versions) });
+  assert.deepEqual(locked.upgrades, []);
+  assert.equal(locked.skipped[0].reason, SKIPPED.HELD);
+  assert.equal(locked.skipped[0].newest, '10.0.12', 'it says what it is holding back');
+
+  const unlocked = await planUpgrades(root, { lock: 'none', run: feed(versions) });
+  assert.equal(unlocked.upgrades[0].to, '10.0.12');
+});
+
+test('genuinely newest is up to date, not held', async () => {
+  const root = await repo({
+    'Api.csproj': csproj('    <PackageReference Include="Current" Version="2.0.0" />'),
+  });
+
+  const plan = await planUpgrades(root, { run: feed({ Current: ['1.0.0', '2.0.0'] }) });
+  assert.equal(plan.skipped[0].reason, SKIPPED.UP_TO_DATE);
+  assert.equal(plan.skipped[0].newest, undefined);
+});
+
+test('a ceiling holds things back too, and says so', async () => {
+  const root = await repo({
+    'Api.csproj': csproj('    <PackageReference Include="P" Version="5.0.0" />'),
+  });
+
+  const plan = await planUpgrades(root, {
+    lock: '<6.0.0',
+    run: feed({ P: ['5.0.0', '5.9.1', '7.0.0'] }),
+  });
+
+  assert.equal(plan.upgrades[0].to, '5.9.1', 'it still takes the best below the ceiling');
+  assert.deepEqual(plan.skipped, [], 'an upgrade was found, so nothing is held');
+});
+
+test('held is reported per site, so nothing is lost in a count', async () => {
+  const root = await repo({
+    'Api.csproj': csproj(
+      '    <PackageReference Include="A" Version="1.0.0" />\n' +
+        '    <PackageReference Include="B" Version="1.0.0" />',
+    ),
+  });
+
+  const plan = await planUpgrades(root, {
+    lock: 'major',
+    run: feed({ A: ['2.0.0'], B: ['2.0.0'] }),
+  });
+  assert.equal(plan.skipped.length, 2);
+  assert.deepEqual(
+    plan.skipped.map((row) => `${row.package}->${row.newest}`).sort(),
+    ['A->2.0.0', 'B->2.0.0'],
+  );
 });

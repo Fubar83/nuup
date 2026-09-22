@@ -15,9 +15,20 @@ import { parseVersion, pickUpgrade } from './version.js';
  * of the tool: it reports by default, and writes only when asked.
  */
 
-/** Why a site was left alone. Each is a different thing to do about it. */
+/**
+ * Why a site was left alone. Each is a different thing to do about it, and
+ * the distinctions are the point: three of these look like "nothing to do"
+ * while meaning something else entirely.
+ *
+ *   up-to-date     nothing newer exists
+ *   held           something newer exists, and the lock excludes it
+ *   not-found      no source offers this package at all
+ *   unchecked      a source failed, so nothing is known either way
+ *   not-a-version  a property or range, which is not ours to rewrite
+ */
 export const SKIPPED = {
   UP_TO_DATE: 'up-to-date',
+  HELD: 'held',
   NOT_A_VERSION: 'not-a-version',
   NOT_FOUND: 'not-found',
   UNCHECKED: 'unchecked',
@@ -101,7 +112,7 @@ export function affectedBy(site, projects) {
  * while reporting success.
  */
 export async function planUpgrades(directory, options = {}) {
-  const { filters = [], lock = 'major', prerelease = false } = options;
+  const { filters = [], lock = 'none', prerelease = false } = options;
   const repo = path.basename(path.resolve(directory));
 
   const { sites, projects } = surveyRepo(directory);
@@ -142,7 +153,17 @@ export async function planUpgrades(directory, options = {}) {
 
     const to = pickUpgrade(site.version, answer.versions, { lock, prerelease });
     if (to === null) {
-      skipped.push({ ...row, reason: SKIPPED.UP_TO_DATE });
+      // "Up to date" and "held back by the lock" both look like nothing to do,
+      // and only one of them is. Being on the newest 8.x while 10.x exists is
+      // not being up to date, and reporting it that way reads as the tool
+      // having missed the newer version. Costs no extra request: the versions
+      // are already in hand.
+      const unlocked = pickUpgrade(site.version, answer.versions, { lock: 'none', prerelease });
+      skipped.push(
+        unlocked === null
+          ? { ...row, reason: SKIPPED.UP_TO_DATE }
+          : { ...row, reason: SKIPPED.HELD, newest: unlocked },
+      );
       continue;
     }
 
